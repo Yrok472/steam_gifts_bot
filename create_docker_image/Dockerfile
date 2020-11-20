@@ -1,4 +1,7 @@
 FROM ubuntu:18.04
+
+ENV PHPSESSID ""
+
 RUN apt update && apt upgrade -y && apt install python3 python3-requests python3-bs4 -y
 RUN mkdir -p /etc/steam_gifts/ /opt/steam_gifts/
 WORKDIR /opt/steam_gifts/

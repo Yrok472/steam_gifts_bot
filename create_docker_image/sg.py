@@ -12,13 +12,14 @@ from subprocess import call
 import datetime
 import configparser
 import zipfile
+import fileinput
 
-version = "1.4.4"
+version = "1.4.5"
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 random.seed(os.urandom)
 
-#determine was script installed by apt-package or was clonned via git clone
+# determine was script installed by apt-package or was clonned via git clone
 if os.path.exists('./settings.cfg'):
     additional_path_for_conf = ""
 else:
@@ -29,11 +30,21 @@ if not os.path.exists('/etc/steam_gifts/settings.cfg'):
     zip_files_for_unpack.extractall('/etc/steam_gifts/')
     zip_files_for_unpack.close()
 
+# change default PHPSESSID to specified in ENV variable
+
+phpsessid_val = os.environ['PHPSESSID']
+
+with fileinput.FileInput((additional_path_for_conf + 'settings.cfg'), inplace=True, backup='.bak') as file:
+    for line in file:
+        print(line.replace('blah_blah_blah', phpsessid_val), end='')
+
+
 def check_new_version(ver):
     """Function for check new version of this script"""
     try:
         if requests.get("https://raw.githubusercontent.com/4815162342lost/steam_gifts_bot/master/version").text.rstrip() == ver:
-            print(f"You are using the latest version of the program. Your version: {ver}")
+            print(
+                f"You are using the latest version of the program. Your version: {ver}")
         else:
             print(
                 "New version is avaliable!\nPlease, visit https://github.com/4815162342lost/steam_gifts_bot and install new version")
@@ -47,7 +58,7 @@ def check_new_version(ver):
 def get_settings():
     """Function for read settings from settings.cfg file"""
     conf = configparser.ConfigParser()
-    conf.optionxform=str
+    conf.optionxform = str
     conf.read(additional_path_for_conf + 'settings.cfg')
     return conf
 
@@ -55,11 +66,13 @@ def get_settings():
 def get_requests(cookie, req_type, headers):
     """Main function for raise other functions"""
     print(f"Working with {req_type} giveaways")
-    def do_requests(cookie, headers, start_link="https://www.steamgifts.com/giveaways/search?page=", end_link="", page_number = 1):
+
+    def do_requests(cookie, headers, start_link="https://www.steamgifts.com/giveaways/search?page=", end_link="", page_number=1):
         """Function for do get requests, decide does next page exist or not and raise next functions for enter to giveaways"""
         while True:
             try:
-                r = requests.get(f"{start_link}{page_number}{end_link}",cookies=cookie, headers=headers)
+                r = requests.get(
+                    f"{start_link}{page_number}{end_link}", cookies=cookie, headers=headers)
                 get_game_links(r)
                 if r.text.find("Next") == -1 or type(page_number) != int:
                     break
@@ -69,7 +82,7 @@ def get_requests(cookie, req_type, headers):
                 print("Site is not available")
                 time.sleep(300)
                 break
-    if req_type == "wishlist" or req_type=="group":
+    if req_type == "wishlist" or req_type == "group":
         do_requests(cookie, headers, end_link=f"&type={req_type}")
     elif req_type == "search_list":
         for current_search in what_search:
@@ -78,19 +91,23 @@ def get_requests(cookie, req_type, headers):
             time.sleep(random.randint(8, 39))
     elif req_type == "random_list" and get_coins() > threshold:
         time.sleep(random.randint(5, 11))
-        do_requests(cookie, headers, start_link="https://www.steamgifts.com/", page_number="")
+        do_requests(cookie, headers,
+                    start_link="https://www.steamgifts.com/", page_number="")
     elif req_type == "enteredlist":
         print("Trying to receive already entered giveaways...")
         entered_list = []
         page_number = 1
         while True:
             try:
-                r = requests.get(f"https://www.steamgifts.com/giveaways/entered/search?page={page_number}", cookies=cookie, headers=headers)
+                r = requests.get(
+                    f"https://www.steamgifts.com/giveaways/entered/search?page={page_number}", cookies=cookie, headers=headers)
                 soup = BeautifulSoup(r.text, "html.parser")
                 links = soup.find_all(class_="table__row-inner-wrap")
                 for get_link in links:
-                    url = get_link.find(class_="table__column__heading").get("href")
-                    check_geaways_end = get_link.find(class_="table__remove-default is-clickable")
+                    url = get_link.find(
+                        class_="table__column__heading").get("href")
+                    check_geaways_end = get_link.find(
+                        class_="table__remove-default is-clickable")
                     if check_geaways_end != None:
                         entered_list.append(url)
                     elif get_link.find(class_="table__column__deleted") != None:
@@ -121,7 +138,8 @@ def get_game_links(requests_result):
                 if enter_geaway(geaway_link):
                     break
             else:
-                print(f"Giveaway url on black list: {geaway_link[geaway_link.rfind('/') + 1:]}")
+                print(
+                    f"Giveaway url on black list: {geaway_link[geaway_link.rfind('/') + 1:]}")
 
 
 def enter_geaway(geaway_link):
@@ -131,7 +149,8 @@ def enter_geaway(geaway_link):
     try:
         r = requests.get(geaway_link, cookies=cookie, headers=headers)
         if r.status_code != 200:
-            set_notify("Site error", f"Error code: {r.status_code}", separator=". ")
+            set_notify(
+                "Site error", f"Error code: {r.status_code}", separator=". ")
             time.sleep(300)
             return False
     except:
@@ -143,7 +162,8 @@ def enter_geaway(geaway_link):
         bad_counter += len(re.findall(bad_word, r.text, flags=re.IGNORECASE))
     if bad_counter > 0:
         for good_word in good_words:
-            good_counter += len(re.findall(good_word, r.text, flags=re.IGNORECASE))
+            good_counter += len(re.findall(good_word,
+                                           r.text, flags=re.IGNORECASE))
         if bad_counter > good_counter:
             print("It is a trap! Be carefully! Bad people want destroy my script!")
             do_beep("bad_words")
@@ -151,7 +171,8 @@ def enter_geaway(geaway_link):
                 bad_giveaways.write(geaway_link + "\n")
             return False
         if bad_counter == good_counter:
-            set_notify("False alarm", f"All nice. Giveaway link: {geaway_link}", separator="! ")
+            set_notify(
+                "False alarm", f"All nice. Giveaway link: {geaway_link}", separator="! ")
     try:
         game = soup_enter.title.string
     except:
@@ -160,15 +181,17 @@ def enter_geaway(geaway_link):
         print(f"Game from blacklist. Ignore: {game} game")
         return False
     try:
-        link = soup_enter.find(class_="sidebar sidebar--wide").form
+        link = soup_enter.find(class_="sidebar").form
     except Exception as e:
         print(f"Unknown error: {e}")
         return False
     if link != None:
         link = link.find_all("input")
-        params = {"xsrf_token": link[0].get("value"), "do": "entry_insert", "code": link[2].get("value")}
+        params = {"xsrf_token": link[0].get(
+            "value"), "do": "entry_insert", "code": link[2].get("value")}
         try:
-            r = requests.post("https://www.steamgifts.com/ajax.php", data=params, cookies=cookie, headers=headers)
+            r = requests.post("https://www.steamgifts.com/ajax.php",
+                              data=params, cookies=cookie, headers=headers)
             extract_coins = json.loads(r.text)
         except:
             print("Site is not available...")
@@ -176,7 +199,8 @@ def enter_geaway(geaway_link):
             return False
         if extract_coins["type"] == "success":
             coins = extract_coins["points"]
-            set_notify("Bot entered to giveaway with game: ", re.sub("&", '', game) + f". Coins left: {coins}", separator="")
+            set_notify("Bot entered to giveaway with game: ", re.sub(
+                "&", '', game) + f". Coins left: {coins}", separator="")
             time.sleep(random.randint(1, 120))
             return False
         elif extract_coins["msg"] == "Not Enough Points":
@@ -197,7 +221,8 @@ def enter_geaway(geaway_link):
         else:
             link = soup_enter.select("div.featured__column span")
             if link != None:
-                print(f"Giveaway was ended. Bot has late to enter giveaway: {geaway_link}. Was ended: {link[0].text}")
+                print(
+                    f"Giveaway was ended. Bot has late to enter giveaway: {geaway_link}. Was ended: {link[0].text}")
                 time.sleep(random.randint(5, 60))
                 return False
             else:
@@ -210,7 +235,8 @@ def enter_geaway(geaway_link):
 def get_coins():
     """How many coins do we have?"""
     try:
-        soup = BeautifulSoup(requests.get("https://www.steamgifts.com/giveaways/search?type=wishlist", cookies=cookie, headers=headers).text, "html.parser")
+        soup = BeautifulSoup(requests.get("https://www.steamgifts.com/giveaways/search?type=wishlist",
+                                          cookies=cookie, headers=headers).text, "html.parser")
         coins = int(soup.find(class_="nav__points").string)
         return coins
     except Exception as e:
@@ -243,10 +269,12 @@ def work_with_win_file(need_write, count):
             read_from_file.seek(0)
             read_from_file.write(str(count))
 
+
 def check_won(count):
     """Check new won giveaway"""
     try:
-        r = requests.get("https://www.steamgifts.com/giveaways/search?type=wishlist", cookies=cookie, headers=headers)
+        r = requests.get(
+            "https://www.steamgifts.com/giveaways/search?type=wishlist", cookies=cookie, headers=headers)
         soup = BeautifulSoup(r.text, "html.parser").find(class_="nav__right-container").find_all("a")[1].find(
             class_="nav__notification").string
     except:
@@ -255,7 +283,8 @@ def check_won(count):
         return 0
     if int(count) < int(soup):
         do_beep("won")
-        set_notify("Congratulations! You won!", "Take your prize on website", separator=" ")
+        set_notify("Congratulations! You won!",
+                   "Take your prize on website", separator=" ")
         work_with_win_file(True, soup)
         return soup
     elif int(count) > int(soup):
@@ -291,7 +320,8 @@ def get_games_from_banners():
         for games in banners:
             if games not in giveaways_from_banner:
                 giveaways_from_banner.append(games.get("href"))
-                print(f"You will never win the game {games.get('href')}, because you have refused to enter giveaways from banner...")
+                print(
+                    f"You will never win the game {games.get('href')}, because you have refused to enter giveaways from banner...")
     except Exception as e:
         print(f"Can not get games from banners...Exception: {e}")
 
@@ -300,16 +330,17 @@ print("I have started...\nHave a nice day!")
 time.sleep(60)
 func_list = []
 
-#let's check is new version available
+# let's check is new version available
 check_new_version(version)
 
-#get settings from settings.cfg file and initialize the variables
-settings=get_settings()
+# get settings from settings.cfg file and initialize the variables
+settings = get_settings()
 cookie = dict(settings._sections['cookies'])
 headers = dict(settings._sections['user-agent'])
 
 need_send_notify = int(settings['settings']['send_notify'])
-need_giveaways_from_banners = int(settings['settings']['giveaways_from_banners'])
+need_giveaways_from_banners = int(
+    settings['settings']['giveaways_from_banners'])
 threshold = int(settings['settings']['threshold'])
 need_beep = int(settings['settings']['beep'])
 silent_mode_at_night = int(settings['settings']['silent_mode_at_night'])
@@ -327,25 +358,30 @@ if platform.system() == "Linux" and need_send_notify:
         from gi.repository.GdkPixbuf import Pixbuf
         pb = Pixbuf.new_from_file("icon.png")
     except Exception as e:
-        print(f'Can not initialize variables for send notification due to exceprtion: {e}')
+        print(
+            f'Can not initialize variables for send notification due to exceprtion: {e}')
 elif platform.system() == "Windows":
     os.system("Chcp 65001")
 
 
-#test cookies
+# test cookies
 try:
-    r = requests.get("https://www.steamgifts.com/giveaways/search?type=wishlist", cookies=cookie, headers=headers)
+    r = requests.get("https://www.steamgifts.com/giveaways/search?type=wishlist",
+                     cookies=cookie, headers=headers)
 except:
     set_notify("Cookies expired", "Please update your cookies")
     do_beep("coockie_exept")
     sys.exit(1)
 
-#read various variables from files
-with open(additional_path_for_conf + "search.txt") as f: what_search = f.read().splitlines()
-with open(additional_path_for_conf + "black_list_games_name.txt") as f: bad_games_name = f.read().splitlines()
-with open("bad_giveaways_link.txt") as f: bad_giveaways_link = f.read().splitlines()
+# read various variables from files
+with open(additional_path_for_conf + "search.txt") as f:
+    what_search = f.read().splitlines()
+with open(additional_path_for_conf + "black_list_games_name.txt") as f:
+    bad_games_name = f.read().splitlines()
+with open("bad_giveaways_link.txt") as f:
+    bad_giveaways_link = f.read().splitlines()
 
-#sleep and get currnt count of coins
+# sleep and get currnt count of coins
 time.sleep(random.randint(2, 10))
 coins = get_coins()
 
@@ -363,7 +399,7 @@ while True:
         get_games_from_banners()
     i_want_to_sleep = False
     for current_func_list in func_list:
-        get_requests(cookie, current_func_list,headers)
+        get_requests(cookie, current_func_list, headers)
         if i_want_to_sleep:
             set_notify("Coins are too low...", "", separator="")
             break
@@ -372,5 +408,6 @@ while True:
     coins = get_coins()
     if not i_want_to_sleep:
         set_notify("I entered to all giveaways...",  f"Coins left: {coins}")
-    set_notify(f"I am going to sleep for {str(sleep_time // 60)} min.", f"Coins left: {coins}", separator=" ")
+    set_notify(
+        f"I am going to sleep for {str(sleep_time // 60)} min.", f"Coins left: {coins}", separator=" ")
     time.sleep(sleep_time)
